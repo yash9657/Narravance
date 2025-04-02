@@ -349,111 +349,213 @@ function DataVisualization({ taskId }) {
   }, [filteredData]);
 
   return (
-    <div className="max-w-6xl mx-auto" ref={containerRef}>
-      <h2 className="text-2xl font-semibold text-gray-800 mb-6">Data Visualization</h2>
-      
-      {/* Filter Panel */}
-      <div className="bg-white shadow rounded-lg p-6 mb-6">
-        <h3 className="text-lg font-medium text-gray-800 mb-4">Filters</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Start Date</label>
-            <input
-              type="date"
-              value={filterStartDate}
-              onChange={(e) => setFilterStartDate(e.target.value)}
-              className="mt-1 block w-full border-gray-300 rounded-md"
-            />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4 sm:px-6 lg:px-8" ref={containerRef}>
+      {/* Header Section */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="px-6 py-8 bg-gradient-to-r from-blue-600 to-blue-700">
+            <h2 className="text-3xl font-bold text-white">Data Analysis Dashboard</h2>
+            <p className="mt-2 text-blue-100">Interactive visualization of car sales data</p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">End Date</label>
-            <input
-              type="date"
-              value={filterEndDate}
-              onChange={(e) => setFilterEndDate(e.target.value)}
-              className="mt-1 block w-full border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Company</label>
-            <select
-              value={filterCompany}
-              onChange={(e) => setFilterCompany(e.target.value)}
-              className="mt-1 block w-full border-gray-300 rounded-md"
-            >
-              <option value="all">All</option>
-              {companies.map((comp) => (
-                <option key={comp} value={comp}>{comp}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Min Price</label>
-            <input
-              type="number"
-              value={filterMinPrice}
-              onChange={(e) => setFilterMinPrice(e.target.value)}
-              className="mt-1 block w-full border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Max Price</label>
-            <input
-              type="number"
-              value={filterMaxPrice}
-              onChange={(e) => setFilterMaxPrice(e.target.value)}
-              className="mt-1 block w-full border-gray-300 rounded-md"
-            />
-          </div>
+
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex flex-col items-center justify-center p-12">
+              <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+              <p className="mt-4 text-gray-600">Processing your data...</p>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && (
+            <div className="p-6">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center text-red-800">
+                <svg className="w-6 h-6 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {error}
+              </div>
+            </div>
+          )}
+
+          {/* Main Content */}
+          {!isLoading && !error && (
+            <div className="p-6">
+              {/* Filters Section */}
+              <div className="bg-gray-50 rounded-xl p-6 mb-8 border border-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Data Filters</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <input
+                      type="date"
+                      value={filterStartDate}
+                      onChange={(e) => setFilterStartDate(e.target.value)}
+                      className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <input
+                      type="date"
+                      value={filterEndDate}
+                      onChange={(e) => setFilterEndDate(e.target.value)}
+                      className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                    <select
+                      value={filterCompany}
+                      onChange={(e) => setFilterCompany(e.target.value)}
+                      className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                    >
+                      <option value="all">All Companies</option>
+                      {companies.map((comp) => (
+                        <option key={comp} value={comp}>{comp}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Min Price</label>
+                    <input
+                      type="number"
+                      value={filterMinPrice}
+                      onChange={(e) => setFilterMinPrice(e.target.value)}
+                      className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                      placeholder="Min price"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Max Price</label>
+                    <input
+                      type="number"
+                      value={filterMaxPrice}
+                      onChange={(e) => setFilterMaxPrice(e.target.value)}
+                      className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                      placeholder="Max price"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <div className="flex items-center">
+                    <div className="p-3 rounded-full bg-blue-50 mr-4">
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total Records</p>
+                      <p className="text-2xl font-bold text-gray-900">{filteredData.length}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <div className="flex items-center">
+                    <div className="p-3 rounded-full bg-green-50 mr-4">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Average Price</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        ${(d3.mean(filteredData, d => d.price) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <div className="flex items-center">
+                    <div className="p-3 rounded-full bg-purple-50 mr-4">
+                      <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Companies</p>
+                      <p className="text-2xl font-bold text-gray-900">{companies.length}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <div className="flex items-center">
+                    <div className="p-3 rounded-full bg-yellow-50 mr-4">
+                      <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Price Range</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        ${Math.min(...filteredData.map(d => d.price)).toLocaleString()} - ${Math.max(...filteredData.map(d => d.price)).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Charts Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Line Chart */}
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Price Trends Over Time</h3>
+                  <div className="aspect-w-16 aspect-h-9">
+                    <div className="overflow-hidden">
+                      <svg ref={lineChartRef} className="w-full h-full"></svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bar Chart */}
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Total Sales by Company</h3>
+                  <div className="aspect-w-16 aspect-h-9">
+                    <div className="overflow-hidden">
+                      <svg ref={barChartRef} className="w-full h-full"></svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pie Chart */}
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Distribution</h3>
+                  <div className="aspect-w-16 aspect-h-9">
+                    <div className="overflow-hidden flex justify-center">
+                      <svg ref={pieChartRef} className="w-full h-full"></svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scatter Plot */}
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Price vs. Horsepower</h3>
+                  <div className="aspect-w-16 aspect-h-9">
+                    <div className="overflow-hidden">
+                      <svg ref={scatterPlotRef} className="w-full h-full"></svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* No Data State */}
+              {!filteredData.length && (
+                <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-6 mt-6 text-center">
+                  <svg className="w-12 h-12 text-yellow-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4" />
+                  </svg>
+                  <h3 className="text-lg font-medium text-yellow-800 mb-2">No Data Available</h3>
+                  <p className="text-yellow-600">Try adjusting your filters to see more results</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Charts Layout */}
-      {isLoading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      ) : error ? (
-        <div className="bg-red-50 text-red-800 p-4 rounded-lg mb-6">{error}</div>
-      ) : !filteredData.length ? (
-        <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg mb-6">
-          No data to display. Adjust your filters or ensure the task is completed.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Line Chart */}
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-            <h3 className="text-lg font-medium text-gray-800 mb-4">Price Trends Over Time</h3>
-            <div className="overflow-x-auto">
-              <svg ref={lineChartRef} className="w-full"></svg>
-            </div>
-          </div>
-
-          {/* Bar Chart */}
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-            <h3 className="text-lg font-medium text-gray-800 mb-4">Total Sales by Company</h3>
-            <div className="overflow-x-auto">
-              <svg ref={barChartRef} className="w-full"></svg>
-            </div>
-          </div>
-
-          {/* Pie Chart */}
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-            <h3 className="text-lg font-medium text-gray-800 mb-4">Sales Proportion by Company</h3>
-            <div className="flex justify-center">
-              <svg ref={pieChartRef}></svg>
-            </div>
-          </div>
-
-          {/* Scatter Plot */}
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-            <h3 className="text-lg font-medium text-gray-800 mb-4">Price vs. Horsepower</h3>
-            <div className="overflow-x-auto">
-              <svg ref={scatterPlotRef} className="w-full"></svg>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
