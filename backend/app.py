@@ -2,6 +2,7 @@ import os
 import threading
 import time
 import queue
+import json  # Import json to handle JSON conversion
 import pandas as pd
 
 from flask import Flask, request, jsonify
@@ -24,7 +25,7 @@ db = SQLAlchemy(app)
 # -----------------------------
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    # e.g., filter parameters can be stored as JSON string (for simplicity)
+    # Store filter parameters as a JSON string
     filters = db.Column(db.String, nullable=True)
     status = db.Column(db.String, default="pending")  # pending, in_progress, completed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -33,7 +34,8 @@ class Task(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
-            'filters': self.filters,
+            # Convert the stored JSON string back to a dictionary if possible
+            'filters': json.loads(self.filters) if self.filters else None,
             'status': self.status,
             'created_at': self.created_at.isoformat(),
             'completed_at': self.completed_at.isoformat() if self.completed_at else None
@@ -151,9 +153,13 @@ worker_thread.start()
 def create_task():
     data = request.get_json() or {}
     filters = data.get('filters', None)
+    # Convert the filters (if provided as a dict) into a JSON string
+    if filters is not None and isinstance(filters, dict):
+        filters = json.dumps(filters)
     new_task = Task(filters=filters, status="pending")
     db.session.add(new_task)
     db.session.commit()
+    # Pass along the filters (now as a JSON string) to the job queue
     job_queue.put((new_task.id, filters))
     return jsonify({'message': 'Task created', 'task': new_task.to_dict()}), 201
 

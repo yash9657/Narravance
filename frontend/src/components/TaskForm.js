@@ -2,7 +2,9 @@
 import React, { useState } from 'react';
 
 function TaskForm({ onTaskCreated }) {
-  const [filters, setFilters] = useState('');
+  const [startDate, setStartDate] = useState('1970-01-01');
+  const [endDate, setEndDate] = useState('1975-12-31');
+  const [carBrands, setCarBrands] = useState('Ford,Toyota');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -10,6 +12,13 @@ function TaskForm({ onTaskCreated }) {
     e.preventDefault();
     setIsLoading(true);
     setMessage({ type: '', text: '' });
+    
+    // Construct a filters object for better structure
+    const filters = {
+      startDate,
+      endDate,
+      carBrands: carBrands.split(',').map(brand => brand.trim())
+    };
 
     try {
       const response = await fetch('http://localhost:5001/tasks', {
@@ -23,7 +32,6 @@ function TaskForm({ onTaskCreated }) {
       const data = await response.json();
       onTaskCreated(data.task);
       setMessage({ type: 'success', text: `Task created with ID: ${data.task.id}` });
-      setFilters('');
     } catch (err) {
       console.error(err);
       setMessage({ type: 'error', text: 'Failed to create task.' });
@@ -46,39 +54,46 @@ function TaskForm({ onTaskCreated }) {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Filtering Parameters
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
           <input
-            type="text"
-            value={filters}
-            onChange={(e) => setFilters(e.target.value)}
-            placeholder="e.g., test, 1970, Ford"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500"
             disabled={isLoading}
           />
-          <p className="mt-2 text-sm text-gray-500">
-            Enter comma-separated values for filtering the data
-          </p>
         </div>
-
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500"
+            disabled={isLoading}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Car Brands (comma separated)</label>
+          <input
+            type="text"
+            value={carBrands}
+            onChange={(e) => setCarBrands(e.target.value)}
+            placeholder="e.g., Ford,Toyota"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500"
+            disabled={isLoading}
+          />
+        </div>
         <button
           type="submit"
           disabled={isLoading}
-          className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg text-white font-medium ${
+          className={`w-full flex justify-center py-3 px-4 rounded-lg text-white font-medium ${
             isLoading
               ? 'bg-blue-400 cursor-not-allowed'
-              : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-          } transition-colors`}
+              : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+          }`}
         >
-          {isLoading ? (
-            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          ) : (
-            'Create Task'
-          )}
+          {isLoading ? 'Creating...' : 'Create Task'}
         </button>
       </form>
     </div>
