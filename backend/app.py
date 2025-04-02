@@ -2,7 +2,7 @@ import os
 import threading
 import time
 import queue
-import json  # Import json to handle JSON conversion
+import json
 import pandas as pd
 
 from flask import Flask, request, jsonify
@@ -10,12 +10,9 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from datetime import datetime
 
-# -----------------------------
-# Configuration and Initialization
-# -----------------------------
 app = Flask(__name__)
 CORS(app)
-# Use SQLite database named data.db in the project root
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
