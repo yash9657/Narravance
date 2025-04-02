@@ -28,25 +28,50 @@ function DataVisualization({ taskId }) {
         setIsLoading(true);
         setError(null);
         try {
-          const response = await fetch(`http://localhost:5001/tasks/${taskId}`);
+          const response = await fetch(`http://localhost:5001/api/v1/tasks/${taskId}`);
           if (response.ok) {
             const taskData = await response.json();
             if (taskData.status === 'completed') {
-              setData(taskData.data);
+              setData(taskData.data || []);
+              return true; // Data is loaded
+            } else if (taskData.status === 'failed') {
+              setError(`Task failed: ${taskData.error_message || 'Unknown error'}`);
+              return true; // Stop polling on failure
             } else {
-              setError('Task is not yet completed.');
+              setError(`Task is ${taskData.status}.`);
+              return false; // Continue polling
             }
           } else {
-            setError('Task not found.');
+            const errorData = await response.json();
+            setError(errorData.message || 'Task not found.');
+            return true; // Stop polling on error
           }
         } catch (err) {
-          console.error(err);
-          setError('Failed to fetch task data.');
+          console.error('Error fetching task data:', err);
+          setError('Failed to fetch task data. Please try again later.');
+          return true; // Stop polling on error
         } finally {
           setIsLoading(false);
         }
       };
-      fetchData();
+
+      let pollInterval;
+      const startPolling = async () => {
+        const shouldStop = await fetchData();
+        if (!shouldStop) {
+          pollInterval = setInterval(async () => {
+            const shouldStop = await fetchData();
+            if (shouldStop && pollInterval) {
+              clearInterval(pollInterval);
+            }
+          }, 10000); // Poll every 10 seconds instead of 5
+        }
+      };
+
+      startPolling();
+      return () => {
+        if (pollInterval) clearInterval(pollInterval);
+      };
     }
   }, [taskId]);
 
@@ -87,15 +112,15 @@ function DataVisualization({ taskId }) {
     const svg = d3
       .select(lineChartRef.current)
       .attr('width', chartWidth)
-      .attr('height', chartHeight);
+      .attr('height', chartHeight)
+      .attr('viewBox', `0 0 ${chartWidth} ${chartHeight}`);
 
-    const margin = { top: 20, right: 30, bottom: 30, left: 60 },
+    const margin = { top: 20, right: 30, bottom: 50, left: 60 },
       width = chartWidth - margin.left - margin.right,
       height = chartHeight - margin.top - margin.bottom;
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Ensure dates and prices are numbers
     const sortedData = filteredData
       .map(d => ({ ...d, sale_date: new Date(d.sale_date), price: +d.price }))
       .sort((a, b) => a.sale_date - b.sale_date);
@@ -109,14 +134,49 @@ function DataVisualization({ taskId }) {
       .nice()
       .range([height, 0]);
 
+    // Add x-axis with rotated labels
     g.append('g')
       .attr('transform', `translate(0,${height})`)
-      .call(d3.axisBottom(x))
-      .attr('class', 'text-gray-600');
+      .attr('class', 'x-axis')
+      .call(
+        d3.axisBottom(x)
+          .tickFormat(d3.timeFormat('%Y-%m-%d'))
+          .ticks(5)
+      )
+      .selectAll('text')
+      .attr('transform', 'rotate(-45)')
+      .style('text-anchor', 'end')
+      .style('font-size', '12px')
+      .style('fill', '#4B5563');
 
+    // X-axis label
+    g.append('text')
+      .attr('class', 'x-axis-label')
+      .attr('text-anchor', 'middle')
+      .attr('x', width / 2)
+      .attr('y', height + margin.bottom - 5)
+      .style('fill', '#4B5563')
+      .style('font-size', '12px')
+      .text('Sale Date');
+
+    // Add y-axis
     g.append('g')
+      .attr('class', 'y-axis')
       .call(d3.axisLeft(y))
-      .attr('class', 'text-gray-600');
+      .style('font-size', '12px')
+      .selectAll('text')
+      .style('fill', '#4B5563');
+
+    // Y-axis label
+    g.append('text')
+      .attr('class', 'y-axis-label')
+      .attr('text-anchor', 'middle')
+      .attr('transform', 'rotate(-90)')
+      .attr('x', -height / 2)
+      .attr('y', -margin.left + 15)
+      .style('fill', '#4B5563')
+      .style('font-size', '12px')
+      .text('Price ($)');
 
     // Grid lines
     g.append('g')
@@ -148,7 +208,7 @@ function DataVisualization({ taskId }) {
   }, [filteredData]);
 
   // --------------------------
-  // BAR CHART: Total Sales (sum of price) by Company
+  // BAR CHART: Total Sales by Company
   // --------------------------
   useEffect(() => {
     if (filteredData.length === 0) return;
@@ -163,9 +223,10 @@ function DataVisualization({ taskId }) {
 
     const svg = d3.select(barChartRef.current)
       .attr('width', chartWidth)
-      .attr('height', chartHeight);
+      .attr('height', chartHeight)
+      .attr('viewBox', `0 0 ${chartWidth} ${chartHeight}`);
 
-    const margin = { top: 20, right: 30, bottom: 60, left: 60 },
+    const margin = { top: 20, right: 30, bottom: 70, left: 60 },
       width = chartWidth - margin.left - margin.right,
       height = chartHeight - margin.top - margin.bottom;
 
@@ -188,18 +249,47 @@ function DataVisualization({ taskId }) {
       .nice()
       .range([height, 0]);
 
+    // X-axis for bar chart
     g.append('g')
       .attr('transform', `translate(0,${height})`)
+      .attr('class', 'x-axis')
       .call(d3.axisBottom(x))
       .selectAll('text')
       .attr('transform', 'rotate(-45)')
       .style('text-anchor', 'end')
-      .attr('class', 'text-gray-600');
+      .style('font-size', '12px')
+      .style('fill', '#4B5563');
 
+    // X-axis label for bar chart
+    g.append('text')
+      .attr('class', 'x-axis-label')
+      .attr('text-anchor', 'middle')
+      .attr('x', width / 2)
+      .attr('y', height + margin.bottom - 5)
+      .style('fill', '#4B5563')
+      .style('font-size', '12px')
+      .text('Company');
+
+    // Y-axis for bar chart
     g.append('g')
+      .attr('class', 'y-axis')
       .call(d3.axisLeft(y))
-      .attr('class', 'text-gray-600');
+      .style('font-size', '12px')
+      .selectAll('text')
+      .style('fill', '#4B5563');
 
+    // Y-axis label for bar chart
+    g.append('text')
+      .attr('class', 'y-axis-label')
+      .attr('text-anchor', 'middle')
+      .attr('transform', 'rotate(-90)')
+      .attr('x', -height / 2)
+      .attr('y', -margin.left + 15)
+      .style('fill', '#4B5563')
+      .style('font-size', '12px')
+      .text('Total Sales ($)');
+
+    // Grid lines
     g.append('g')
       .attr('class', 'grid')
       .attr('opacity', 0.1)
@@ -224,7 +314,6 @@ function DataVisualization({ taskId }) {
   useEffect(() => {
     if (filteredData.length === 0) return;
 
-    const container = containerRef.current;
     const chartWidth = 400;
     const chartHeight = 400;
     const radius = Math.min(chartWidth, chartHeight) / 2;
@@ -234,10 +323,10 @@ function DataVisualization({ taskId }) {
     const svg = d3.select(pieChartRef.current)
       .attr('width', chartWidth)
       .attr('height', chartHeight)
+      .attr('viewBox', `0 0 ${chartWidth} ${chartHeight}`)
       .append('g')
       .attr('transform', `translate(${chartWidth / 2},${chartHeight / 2})`);
 
-    // Aggregate count by company
     const pieData = d3.rollups(
       filteredData,
       v => v.length,
@@ -265,7 +354,6 @@ function DataVisualization({ taskId }) {
       .style('stroke-width', '2px')
       .style('opacity', 0.8);
 
-    // Optionally, add labels
     svg.selectAll('text')
       .data(data_ready)
       .enter()
@@ -291,15 +379,15 @@ function DataVisualization({ taskId }) {
 
     const svg = d3.select(scatterPlotRef.current)
       .attr('width', chartWidth)
-      .attr('height', chartHeight);
+      .attr('height', chartHeight)
+      .attr('viewBox', `0 0 ${chartWidth} ${chartHeight}`);
 
-    const margin = { top: 20, right: 30, bottom: 50, left: 60 },
+    const margin = { top: 20, right: 30, bottom: 60, left: 60 },
       width = chartWidth - margin.left - margin.right,
       height = chartHeight - margin.top - margin.bottom;
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Ensure numeric values for price and horsepower
     const scatterData = filteredData.map(d => ({
       price: +d.price,
       horsepower: +d.horsepower
@@ -315,27 +403,43 @@ function DataVisualization({ taskId }) {
       .nice()
       .range([height, 0]);
 
+    // X-axis for scatter plot
     g.append('g')
       .attr('transform', `translate(0,${height})`)
+      .attr('class', 'x-axis')
       .call(d3.axisBottom(x))
-      .attr('class', 'text-gray-600')
-      .append('text')
-      .attr('x', width / 2)
-      .attr('y', 40)
-      .attr('fill', '#000')
+      .style('font-size', '12px')
+      .selectAll('text')
+      .style('fill', '#4B5563');
+
+    // X-axis label for scatter plot
+    g.append('text')
+      .attr('class', 'x-axis-label')
       .attr('text-anchor', 'middle')
+      .attr('x', width / 2)
+      .attr('y', height + margin.bottom - 5)
+      .style('fill', '#4B5563')
+      .style('font-size', '12px')
       .text('Horsepower');
 
+    // Y-axis for scatter plot
     g.append('g')
+      .attr('class', 'y-axis')
       .call(d3.axisLeft(y))
-      .attr('class', 'text-gray-600')
-      .append('text')
+      .style('font-size', '12px')
+      .selectAll('text')
+      .style('fill', '#4B5563');
+
+    // Y-axis label for scatter plot
+    g.append('text')
+      .attr('class', 'y-axis-label')
+      .attr('text-anchor', 'middle')
       .attr('transform', 'rotate(-90)')
       .attr('x', -height / 2)
-      .attr('y', -40)
-      .attr('fill', '#000')
-      .attr('text-anchor', 'middle')
-      .text('Price');
+      .attr('y', -margin.left + 15)
+      .style('fill', '#4B5563')
+      .style('font-size', '12px')
+      .text('Price ($)');
 
     g.selectAll('circle')
       .data(scatterData)

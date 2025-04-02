@@ -15,26 +15,34 @@ function TaskForm({ onTaskCreated }) {
     
     // Construct a filters object for better structure
     const filters = {
-      startDate,
-      endDate,
-      carBrands: carBrands.split(',').map(brand => brand.trim())
+      startDate: startDate,
+      endDate: endDate,
+      carBrands: carBrands.split(',').map(brand => brand.trim()).filter(brand => brand)
     };
 
     try {
-      const response = await fetch('http://localhost:5001/tasks', {
+      console.log('Sending request with filters:', filters);
+      const response = await fetch('http://localhost:5001/api/v1/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filters }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ filters })
       });
-      if (!response.ok) {
-        throw new Error('Error creating task');
-      }
+
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Error creating task');
+      }
+
+      console.log('Response data:', data);
       onTaskCreated(data.task);
       setMessage({ type: 'success', text: `Task created with ID: ${data.task.id}` });
     } catch (err) {
-      console.error(err);
-      setMessage({ type: 'error', text: 'Failed to create task.' });
+      console.error('Error details:', err);
+      setMessage({ type: 'error', text: err.message || 'Failed to create task.' });
     } finally {
       setIsLoading(false);
     }

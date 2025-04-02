@@ -1,182 +1,163 @@
-import os
-import threading
-import time
-import queue
-import json
-import pandas as pd
-
 from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from datetime import datetime
+from flask_caching import Cache
+import logging
+from functools import wraps
+import time
 
+from config import Config
+from models import db, Task
+from worker import JobQueue
+
+# Initialize Flask app
 app = Flask(__name__)
-CORS(app)
+app.config.from_object(Config)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
+# Initialize extensions
+CORS(app, 
+     resources={
+         r"/*": {
+             "origins": Config.CORS_ORIGINS,
+             "methods": ["GET", "POST", "OPTIONS"],
+             "allow_headers": ["Content-Type"]
+         }
+     },
+     supports_credentials=True
+)
+cache = Cache(app)
+db.init_app(app)
 
-# -----------------------------
-# Database Models
-# -----------------------------
-class Task(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    # Store filter parameters as a JSON string
-    filters = db.Column(db.String, nullable=True)
-    status = db.Column(db.String, default="pending")  # pending, in_progress, completed
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    completed_at = db.Column(db.DateTime, nullable=True)
+# Set up logging
+logging.basicConfig(level=Config.LOG_LEVEL, format=Config.LOG_FORMAT)
+logger = logging.getLogger(__name__)
 
-    def to_dict(self):
-        return {
-            'id': self.id,
-            # Convert the stored JSON string back to a dictionary if possible
-            'filters': json.loads(self.filters) if self.filters else None,
-            'status': self.status,
-            'created_at': self.created_at.isoformat(),
-            'completed_at': self.completed_at.isoformat() if self.completed_at else None
-        }
+# Initialize job queue
+job_queue = JobQueue(app)
+job_queue.start_worker()
 
-class DataRecord(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
-    company = db.Column(db.String, nullable=True)
-    name = db.Column(db.String, nullable=True)
-    mpg = db.Column(db.Float, nullable=True)
-    cylinders = db.Column(db.Integer, nullable=True)
-    displacement = db.Column(db.Float, nullable=True)
-    horsepower = db.Column(db.Float, nullable=True)
-    weight = db.Column(db.Float, nullable=True)
-    acceleration = db.Column(db.Float, nullable=True)
-    sale_date = db.Column(db.DateTime, nullable=True)
-    price = db.Column(db.Integer, nullable=True)
-    origin = db.Column(db.String, nullable=True)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'task_id': self.task_id,
-            'company': self.company,
-            'name': self.name,
-            'mpg': self.mpg,
-            'cylinders': self.cylinders,
-            'displacement': self.displacement,
-            'horsepower': self.horsepower,
-            'weight': self.weight,
-            'acceleration': self.acceleration,
-            'sale_date': self.sale_date.isoformat() if self.sale_date else None,
-            'price': self.price,
-            'origin': self.origin
-        }
-
-# Create the database tables if they don't exist yet
-with app.app_context():
-    db.create_all()
-
-# -----------------------------
-# In-Memory Job Queue and Worker
-# -----------------------------
-job_queue = queue.Queue()
-
-def data_ingestion(task_id, filters=None):
+def create_tables():
+    """Create database tables"""
     with app.app_context():
-        print(f"[Task {task_id}] Starting data ingestion...", flush=True)
-        time.sleep(5)  # Simulate delay before starting
+        db.create_all()
+        logger.info("Database tables created")
 
-        # Update task status to "in_progress"
-        task = db.session.get(Task, task_id)
-        task.status = "in_progress"
-        db.session.commit()
-        print(f"[Task {task_id}] Status set to in_progress.", flush=True)
-
-        # Read unified data from CSV (simulate merging external sources)
-        data_path = os.path.join(os.getcwd(), "data", "unified_cars.csv")
-        if not os.path.exists(data_path):
-            print(f"[Task {task_id}] ERROR: File {data_path} not found!", flush=True)
-            return
-        else:
-            print(f"[Task {task_id}] Found file at {data_path}", flush=True)
-
-        df = pd.read_csv(data_path)
-        print(f"[Task {task_id}] Read {len(df)} rows from unified_cars.csv.", flush=True)
-
-        # Insert records into DataRecord table with the associated task_id
-        for i, (_, row) in enumerate(df.iterrows(), start=1):
-            if i % 100 == 0:
-                print(f"[Task {task_id}] Processed {i} / {len(df)} records...", flush=True)
-            sale_date = pd.to_datetime(row['sale_date'], errors='coerce')
-            record = DataRecord(
-                task_id=task_id,
-                company=row.get('company'),
-                name=row.get('name'),
-                mpg=row.get('mpg'),
-                cylinders=row.get('cylinders'),
-                displacement=row.get('displacement'),
-                horsepower=row.get('horsepower'),
-                weight=row.get('weight'),
-                acceleration=row.get('acceleration'),
-                sale_date=sale_date,
-                price=row.get('price'),
-                origin=row.get('origin')
-            )
-            db.session.add(record)
-        print(f"[Task {task_id}] Finished processing records. Committing to database...", flush=True)
-
-        # Mark task as completed
-        task.status = "completed"
-        task.completed_at = datetime.utcnow()
-        db.session.commit()
-        print(f"[Task {task_id}] Task marked as completed.", flush=True)
-
-def worker():
-    while True:
-        task_id, filters = job_queue.get()
-        print(f"[Worker] Picked up task {task_id}.", flush=True)
+# -----------------------------
+# Decorators
+# -----------------------------
+def handle_exceptions(f):
+    """Decorator to handle exceptions and return appropriate responses"""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
         try:
-            data_ingestion(task_id, filters)
+            return f(*args, **kwargs)
         except Exception as e:
-            print(f"[Worker] Error processing task {task_id}: {e}", flush=True)
-        finally:
-            job_queue.task_done()
+            logger.error(f"Error in {f.__name__}: {str(e)}")
+            return jsonify({
+                'error': 'Internal server error',
+                'message': str(e)
+            }), 500
+    return wrapper
 
-worker_thread = threading.Thread(target=worker, daemon=True)
-worker_thread.start()
+def monitor_performance(f):
+    """Decorator to monitor endpoint performance"""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = f(*args, **kwargs)
+        duration = time.time() - start_time
+        logger.info(f"{f.__name__} took {duration:.2f} seconds")
+        return result
+    return wrapper
 
 # -----------------------------
 # API Endpoints
 # -----------------------------
-@app.route('/tasks', methods=['POST'])
+@app.route(f'{Config.API_PREFIX}/tasks', methods=['POST'])
+@handle_exceptions
+@monitor_performance
 def create_task():
-    data = request.get_json() or {}
-    filters = data.get('filters', None)
-    # Convert the filters (if provided as a dict) into a JSON string
-    if filters is not None and isinstance(filters, dict):
-        filters = json.dumps(filters)
-    new_task = Task(filters=filters, status="pending")
-    db.session.add(new_task)
-    db.session.commit()
-    # Pass along the filters (now as a JSON string) to the job queue
-    job_queue.put((new_task.id, filters))
-    return jsonify({'message': 'Task created', 'task': new_task.to_dict()}), 201
+    """Create a new data processing task"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'error': 'Invalid request',
+                'message': 'No JSON data provided'
+            }), 400
 
-@app.route('/tasks/<int:task_id>', methods=['GET'])
+        filters = data.get('filters')
+        logger.info(f"Received task creation request with filters: {filters}")
+        
+        # Input validation
+        if filters and not isinstance(filters, dict):
+            return jsonify({
+                'error': 'Invalid filters format',
+                'message': 'Filters must be a dictionary'
+            }), 400
+
+        # Create task
+        new_task = Task(
+            filters=filters,
+            status="pending"
+        )
+        db.session.add(new_task)
+        db.session.commit()
+        logger.info(f"Created new task with ID: {new_task.id}")
+        
+        # Add to job queue
+        if not job_queue.add_task(new_task.id, filters):
+            new_task.status = "failed"
+            new_task.error_message = "Queue is full"
+            db.session.commit()
+            return jsonify({
+                'error': 'Queue full',
+                'message': 'Server is busy, please try again later'
+            }), 503
+
+        return jsonify({
+            'message': 'Task created',
+            'task': new_task.to_dict()
+        }), 201
+    except Exception as e:
+        logger.error(f"Error in create_task: {str(e)}", exc_info=True)
+        return jsonify({
+            'error': 'Server error',
+            'message': str(e)
+        }), 500
+
+@app.route(f'{Config.API_PREFIX}/tasks/<int:task_id>', methods=['GET'])
+@handle_exceptions
+@monitor_performance
+@cache.memoize(timeout=60)  # Cache results for 1 minute
 def get_task(task_id):
-    db.session.remove()
+    """Get task status and data"""
     task = db.session.get(Task, task_id)
     if not task:
-        return jsonify({'error': 'Task not found'}), 404
+        return jsonify({
+            'error': 'Not found',
+            'message': 'Task not found'
+        }), 404
 
-    db.session.refresh(task)
-    print(f"[GET] Task {task_id} status after refresh: {task.status}", flush=True)
     response = task.to_dict()
+    
+    # Include data if task is completed
     if task.status == "completed":
-        records = DataRecord.query.filter_by(task_id=task_id).all()
-        response['data'] = [record.to_dict() for record in records]
+        response['data'] = [record.to_dict() for record in task.records]
+    
     return jsonify(response)
 
+@app.route(f'{Config.API_PREFIX}/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'queue_size': job_queue.queue.qsize(),
+        'worker_active': job_queue.worker_thread and job_queue.worker_thread.is_alive()
+    })
+
 # -----------------------------
-# Run the Flask Application
+# Application Startup
 # -----------------------------
 if __name__ == '__main__':
+    create_tables()
     app.run(debug=True, host='0.0.0.0', port=5001)
